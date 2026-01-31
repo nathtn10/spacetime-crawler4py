@@ -15,6 +15,7 @@ Windows: https://www.python.org/downloads/windows/
 Linux: https://docs.python-guide.org/starting/install3/linux/
 
 MAC: https://docs.python-guide.org/starting/install3/osx/
+hi
 
 Check if pip is installed by opening up a terminal/command prompt and typing
 the commands `python3 -m pip`. This should show the help menu for all the 
