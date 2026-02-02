@@ -1,5 +1,16 @@
 import re
 from urllib.parse import urlparse
+#Use BeautifulSoup to parse html
+from bs4 import BeautifulSoup
+
+#A set to store unique visited urls
+visited_urls = set()
+#Dictionary to store the longest page and its word count
+longest_page= {"url": "", "words_count" : 0}
+#Dictionary to store words and its counts
+word_frequencies = {}
+#Dictionary to store subdomains and number of pages in that subdomain {subdomain: unique pages count}
+subdomains = {} 
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
