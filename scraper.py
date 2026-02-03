@@ -3,6 +3,8 @@ from urllib.parse import urlparse
 #Use BeautifulSoup to parse html
 from bs4 import BeautifulSoup
 
+# test commment
+
 #A set to store unique visited urls
 visited_urls = set()
 #Dictionary to store the longest page and its word count
