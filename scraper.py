@@ -61,11 +61,27 @@ def extract_next_links(url, resp):
 
 def tokenize(resp): 
 
+    tokens = [] 
+    current = []
 
     stop_words = stopwords.words('english')
-     if ch.isalnum() and ch.isascii():
-        if ch in stop_words :
-            ch.append()
+
+    for ch in resp :
+        if ch.isalnum() and ch.isascii() :
+            current.append(ch.lower())
+        else :
+            if current :
+                word = "".join(current)
+                if word not in stop_words :
+                    tokens.append(word)
+                current = []
+
+    if current :
+        word = "".join(current)
+        if word not in stop_words :
+            tokens.append(word)
+
+    return tokens
 
 
 def is_valid(url):
