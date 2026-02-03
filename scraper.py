@@ -1,5 +1,5 @@
 import re
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
 import nltk
 nltk.download('stopwords')
@@ -30,7 +30,7 @@ def extract_next_links(url, resp):
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
     links = [] 
 
-    if resp is None or resp.status != 200 or resp.raw_response is None or resp.raw_response.content: 
+    if resp is None or resp.status != 200 or resp.raw_response is None or not resp.raw_response.content: 
         print(resp.error)
         return links
 
@@ -43,13 +43,19 @@ def extract_next_links(url, resp):
         sub = parsed_url.netloc
         subdomains[sub] = subdomains.get(sub, 0) + 1
 
-    soup = BeautifulSoup(resp.raw_response.content, 'lxml')
+    soup = BeautifulSoup(resp.raw_response.content, 'html.parser')
     #This gets all the text
     all_text = soup.get_text()
 
     #This gets the url from the href tags
     for link in soup.find_all('a', href=True):
         href = link['href']
+        abs_url = urljoin(url, href)
+        parsed_href = urlparse(abs_url)
+        clean_url = parsed_href.scheme + "://" + parsed_href.netloc + parsed_href.path
+        if parsed_href.query:
+            clean_url += "?" + parsed_href.query
+        #print("appending " + clean_url)
         links.append(href)
 
         #parsed_href = urlparse(href)
