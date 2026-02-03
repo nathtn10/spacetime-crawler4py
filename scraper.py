@@ -34,6 +34,15 @@ def extract_next_links(url, resp):
         print(resp.error)
         return links
 
+    #Add to visited url
+    visited_urls.add(url)
+
+    #Subdomains count
+    parsed_url = urlparse(url)
+    if "uci.edu" in parsed_url.netloc:
+        sub = parsed_url.netloc
+        subdomains[sub] = subdomains.get(sub, 0) + 1
+
     soup = BeautifulSoup(resp.raw_response.content, 'html.parser')
     #This gets all the text
     all_text = soup.get_text()
@@ -41,6 +50,10 @@ def extract_next_links(url, resp):
     #This gets the url from the href tags
     for link in soup.find_all('a', href=True)
         href = link['href']
+
+        #parsed_href = urlparse(href)
+        #Defragment
+        #parsed_href._replace(fragment="").geturl()
         
     
     return list()
@@ -63,6 +76,13 @@ def is_valid(url):
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
+
+        #Specification 3 - 1
+        #Check if domain ends with the allowed domains
+        allowed_domains = ["ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
+        if not any(parsed.netloc.endswith(domain) for domain in allowed_domains):
+            return False
+
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
