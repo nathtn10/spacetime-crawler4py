@@ -43,20 +43,21 @@ def extract_next_links(url, resp):
         sub = parsed_url.netloc
         subdomains[sub] = subdomains.get(sub, 0) + 1
 
-    soup = BeautifulSoup(resp.raw_response.content, 'html.parser')
+    soup = BeautifulSoup(resp.raw_response.content, 'lxml')
     #This gets all the text
     all_text = soup.get_text()
 
     #This gets the url from the href tags
     for link in soup.find_all('a', href=True)
         href = link['href']
+        links.append(href)
 
         #parsed_href = urlparse(href)
         #Defragment
         #parsed_href._replace(fragment="").geturl()
         
     
-    return list()
+    return links
 
 
 def tokenize(resp): 
