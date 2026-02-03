@@ -1,6 +1,6 @@
 import re
 from urllib.parse import urlparse
-from bs4 import BeautifulShop
+from bs4 import BeautifulSoup
 import nltk
 nltk.download('stopwords')
 from nltk.corpus import stopwords
@@ -48,7 +48,7 @@ def extract_next_links(url, resp):
     all_text = soup.get_text()
 
     #This gets the url from the href tags
-    for link in soup.find_all('a', href=True)
+    for link in soup.find_all('a', href=True):
         href = link['href']
         links.append(href)
 
