@@ -1,9 +1,9 @@
 import re
 from urllib.parse import urlparse
-#Use BeautifulSoup to parse html
-from bs4 import BeautifulSoup
-
-# test commment
+from bs4 import BeautifulShop
+import nltk
+nltk.download('stopwords')
+from nltk.corpus import stopwords
 
 #A set to store unique visited urls
 visited_urls = set()
@@ -28,7 +28,32 @@ def extract_next_links(url, resp):
     #         resp.raw_response.url: the url, again
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
+    links = [] 
+
+    if resp is None or resp.status != 200 or resp.raw_response is None or resp.raw_response.content: 
+        print(resp.error)
+        return links
+
+    soup = BeautifulSoup(resp.raw_response.content, 'html.parser')
+    #This gets all the text
+    all_text = soup.get_text()
+
+    #This gets the url from the href tags
+    for link in soup.find_all('a', href=True)
+        href = link['href']
+        
+    
     return list()
+
+
+def tokenize(resp): 
+
+
+    stop_words = stopwords.words('english')
+     if ch.isalnum() and ch.isascii():
+        if ch in stop_words :
+            ch.append()
+
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
