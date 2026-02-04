@@ -43,7 +43,7 @@ def extract_next_links(url, resp):
         sub = parsed_url.netloc
         subdomains[sub] = subdomains.get(sub, 0) + 1
 
-    soup = BeautifulSoup(resp.raw_response.content, 'html.parser')
+    soup = BeautifulSoup(resp.raw_response.content, 'lxml')
     #This gets all the text
     all_text = soup.get_text()
 
@@ -56,7 +56,7 @@ def extract_next_links(url, resp):
         if parsed_href.query:
             clean_url += "?" + parsed_href.query
         #print("appending " + clean_url)
-        links.append(href)
+        links.append(clean_url)
 
         #parsed_href = urlparse(href)
         #Defragment
@@ -104,6 +104,9 @@ def is_valid(url):
         #Check if domain ends with the allowed domains
         allowed_domains = ["ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
         if not any(parsed.netloc.endswith(domain) for domain in allowed_domains):
+            return False
+
+        if re.match(r"^.*?(/.+?/).*?\1.*?\1.*?$", parsed.path.lower()):
             return False
 
         return not re.match(
