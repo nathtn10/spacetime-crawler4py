@@ -47,6 +47,13 @@ def extract_next_links(url, resp):
     #This gets all the text
     all_text = soup.get_text()
 
+    tokens = tokenize(all_text)
+
+    if len(tokens) > longest_pages["words_count"] :
+        longest_page["url"] = url 
+        longest_page["words_count"] = len(tokens)
+        
+
     #This gets the url from the href tags
     for link in soup.find_all('a', href=True):
         href = link['href']
