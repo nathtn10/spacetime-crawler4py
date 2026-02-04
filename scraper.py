@@ -2,7 +2,7 @@ import re
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
 import nltk
-nltk.download('stopwords')
+#nltk.download('stopwords')
 from nltk.corpus import stopwords
 
 #A set to store unique visited urls
@@ -106,7 +106,13 @@ def is_valid(url):
         if not any(parsed.netloc.endswith(domain) for domain in allowed_domains):
             return False
 
+        if any(x in parsed.path.lower() for x in ["/pix/"]):
+            return False
+
         if re.match(r"^.*?(/.+?/).*?\1.*?\1.*?$", parsed.path.lower()):
+            return False
+
+        if "ical" in parsed.query.lower():
             return False
 
         return not re.match(
