@@ -97,6 +97,10 @@ def tokenize(resp):
 
     return tokens
 
+def top50(word_freuqncies):
+    sorted_words = sorted(word_frequencies.items(), key=lambda x: x[1])
+    return sorted_words[:50]
+
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
