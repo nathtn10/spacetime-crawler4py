@@ -50,7 +50,7 @@ def extract_next_links(url, resp):
 
     tokens = tokenize(all_text)
 
-    if len(tokens) > longest_pages["words_count"] :
+    if len(tokens) > longest_page["words_count"] :
         longest_page["url"] = url 
         longest_page["words_count"] = len(tokens)
         
@@ -128,14 +128,22 @@ def is_valid(url):
         if not any(parsed.netloc.endswith(domain) for domain in allowed_domains):
             return False
 
-        if any(x in parsed.path.lower() for x in ["/pix/"]):
+        path_check = ["/pix/", "events"]
+
+        if any(word in parsed.path.lower() for word in path_check):
             return False
+
+        calendar_words = ["calendar", "ical", "=date"]
 
         if re.match(r"^.*?(/.+?/).*?\1.*?\1.*?$", parsed.path.lower()):
             return False
 
-        if "ical" in parsed.query.lower():
+        if any(word in parsed.query.lower() for word in calendar_words):
             return False
+
+        if ".php" in parsed.path.lower():
+            return False
+
 
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
@@ -147,6 +155,6 @@ def is_valid(url):
             + r"|thmx|mso|arff|rtf|jar|csv"
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
 
-    except TypeError:
+    except (TypeError, ValueError):
         print ("TypeError for ", parsed)
         raise
