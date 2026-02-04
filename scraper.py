@@ -38,10 +38,11 @@ def extract_next_links(url, resp):
     visited_urls.add(url)
 
     #Subdomains count
-    parsed_url = urlparse(url)
+    '''parsed_url = urlparse(url)
     if "uci.edu" in parsed_url.netloc:
         sub = parsed_url.netloc
-        subdomains[sub] = subdomains.get(sub, 0) + 1
+        subdomains[sub] = subdomains.get(sub, 0) + 1'''
+    
 
     soup = BeautifulSoup(resp.raw_response.content, 'lxml')
     #This gets all the text
@@ -97,10 +98,20 @@ def tokenize(resp):
 
     return tokens
 
-def top50(word_freuqncies):
+def top50(word_freuqncies): 
     sorted_words = sorted(word_frequencies.items(), key=lambda x: x[1])
     return sorted_words[:50]
 
+def subdomains(visted_urls):
+    subdomains = {}
+    for url in visted_urls:
+        parsed = urlparse(url)
+        domains = parsed.netloc
+
+        if domains.endswith("uci.edu"):
+            subdomains[domains] = subdomains.get(domains, 0) + 1
+    
+    return sorted(subdomains.items())
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
