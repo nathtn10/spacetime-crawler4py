@@ -133,7 +133,7 @@ def is_valid(url):
         if any(word in parsed.path.lower() for word in path_check):
             return False
 
-        calendar_words = ["calendar", "ical", "=date"]
+        calendar_words = ["calendar", "ical", "=date", "share="]
 
         if re.match(r"^.*?(/.+?/).*?\1.*?\1.*?$", parsed.path.lower()):
             return False
@@ -147,7 +147,7 @@ def is_valid(url):
 
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
-            + r"|png|tiff?|mid|mp2|mp3|mp4"
+            + r"|png|tiff?|mid|mp2|mp3|mp4|mpg"
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
             + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
@@ -156,5 +156,5 @@ def is_valid(url):
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
 
     except (TypeError, ValueError):
-        print ("TypeError for ", parsed)
+        print("Skipping malformed URL: " + url)
         raise
