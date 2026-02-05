@@ -16,7 +16,47 @@ subdomains = {}
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
+    if len(visited_urls) % 50 == 0:
+        print_final_report()
+
+        # Optional: Save to a file instead of just printing
+        with open("crawler_report.txt", "w") as f:
+            f.write(f"Unique Pages: {len(visited_urls)}\n")
+            f.write(f"Longest Page: {longest_page['url']} ({longest_page['words_count']})\n")
+
     return [link for link in links if is_valid(link)]
+
+
+def print_final_report():
+    print("=" * 40)
+    print(f"FINAL REPORT")
+    print("=" * 40)
+
+    # 1. Unique Pages
+    print(f"Unique Pages Found: {len(visited_urls)}")
+
+    # 2. Longest Page
+    print(f"Longest Page: {longest_page['url']}")
+    print(f"Word Count: {longest_page['words_count']}")
+
+    # 3. Top 50 Common Words
+    print("-" * 40)
+    print("Top 50 Common Words")
+    print("-" * 40)
+    # Sort by count (descending) and take top 50
+    sorted_words = sorted(word_frequencies.items(), key=lambda x: x[1], reverse=True)[:50]
+    for word, count in sorted_words:
+        print(f"{word}: {count}")
+
+    # 4. Subdomains
+    print("-" * 40)
+    print("Subdomains in ics.uci.edu")
+    print("-" * 40)
+    # Sort alphabetically
+    for sub, count in sorted(subdomains.items()):
+        print(f"{sub}, {count}")
+
+    print("=" * 40)
 
 def extract_next_links(url, resp):
     # Implementation required.
@@ -60,15 +100,12 @@ def extract_next_links(url, resp):
         href = link['href']
         abs_url = urljoin(url, href)
         parsed_href = urlparse(abs_url)
+        #Defrag
         clean_url = parsed_href.scheme + "://" + parsed_href.netloc + parsed_href.path
         if parsed_href.query:
             clean_url += "?" + parsed_href.query
         #print("appending " + clean_url)
         links.append(clean_url)
-
-        #parsed_href = urlparse(href)
-        #Defragment
-        #parsed_href._replace(fragment="").geturl()
         
     
     return links
