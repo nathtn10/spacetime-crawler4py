@@ -128,7 +128,7 @@ def is_valid(url):
         if not any(parsed.netloc.endswith(domain) for domain in allowed_domains):
             return False
 
-        path_check = ["/pix/", "events"]
+        path_check = ["/pix/", "events", "event"]
 
         if any(word in parsed.path.lower() for word in path_check):
             return False
