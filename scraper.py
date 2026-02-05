@@ -128,7 +128,7 @@ def is_valid(url):
         if not any(parsed.netloc.endswith(domain) for domain in allowed_domains):
             return False
 
-        path_check = ["/pix/", "events", "event"]
+        path_check = ["/pix/", "events", "event", ".php"]
 
         if any(word in parsed.path.lower() for word in path_check):
             return False
@@ -141,8 +141,8 @@ def is_valid(url):
         if any(word in parsed.query.lower() for word in calendar_words):
             return False
 
-        if ".php" in parsed.path.lower():
-            return False
+        # if ".php" in parsed.path.lower():
+        #     return False
 
 
         return not re.match(
