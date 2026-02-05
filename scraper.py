@@ -70,9 +70,13 @@ def extract_next_links(url, resp):
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
     links = [] 
 
-    if resp is None or resp.status != 200 or resp.raw_response is None or not resp.raw_response.content: 
+    #change
+    if resp is None or resp.status != 200 : 
         print(resp.error)
         return links
+    if resp.raw_response is None or not resp.raw_response.content: 
+        print(resp.eror)
+        return links 
 
     #Add to visited url
     visited_urls.add(url)
