@@ -1,9 +1,12 @@
+from curses.ascii import isalpha
 import re
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
 import nltk
-#nltk.download('stopwords')
+nltk.download('stopwords')
 from nltk.corpus import stopwords
+from nltk.corpus import words
+from nltk.tokenize import word_tokenize
 
 #A set to store unique visited urls
 visited_urls = set()
@@ -13,6 +16,8 @@ longest_page= {"url": "", "words_count" : 0}
 word_frequencies = {}
 #Dictionary to store subdomains and number of pages in that subdomain {subdomain: unique pages count}
 subdomains = {} 
+#Load the english words in nltk
+english_vocab = set(words.words())
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
@@ -53,7 +58,7 @@ def print_final_report():
     print("Subdomains in ics.uci.edu")
     print("-" * 40)
     # Sort alphabetically
-    for sub, count in sorted(subdomains.items()):
+    for sub, count in sorted(count_subdomains(visited_urls)): #subdomains.items()):
         print(f"{sub}, {count}")
 
     print("=" * 40)
@@ -75,8 +80,13 @@ def extract_next_links(url, resp):
         print(resp.error)
         return links
     if resp.raw_response is None or not resp.raw_response.content: 
-        print(resp.eror)
+        print(resp.error)
         return links 
+
+    #Check if its text
+    content_type = resp.raw_response.headers.get('Content-Type', '').lower()
+    if "text" not in content_type and "html" not in content_type:
+        return links
 
     #Add to visited url
     visited_urls.add(url)
@@ -93,6 +103,9 @@ def extract_next_links(url, resp):
     all_text = soup.get_text()
 
     tokens = tokenize(all_text)
+    for word in tokens:
+        word_frequencies[word] = word_frequencies.get(word, 0) + 1
+
 
     if len(tokens) > longest_page["words_count"] :
         longest_page["url"] = url 
@@ -102,21 +115,53 @@ def extract_next_links(url, resp):
     #This gets the url from the href tags
     for link in soup.find_all('a', href=True):
         href = link['href']
-        abs_url = urljoin(url, href)
-        parsed_href = urlparse(abs_url)
-        #Defrag
-        clean_url = parsed_href.scheme + "://" + parsed_href.netloc + parsed_href.path
-        if parsed_href.query:
-            clean_url += "?" + parsed_href.query
-        #print("appending " + clean_url)
-        links.append(clean_url)
+        try:
+            abs_url = urljoin(url, href)
+            parsed_href = urlparse(abs_url)
+
+            #Skip non http schemes like mailto: or javascript:
+            if parsed_href.scheme not in ["http", "https"]:
+                continue
+
+            #Defrag
+            #clean_url = parsed_href.scheme + "://" + parsed_href.netloc + parsed_href.path
+            #if parsed_href.query:
+                #clean_url += "?" + parsed_href.query
+            clean_url = parsed_href._replace(fragment="").geturl()
+
+            #print("appending " + clean_url)
+            links.append(clean_url)
+        except ValueError:
+            print("Skipping parsed error URL: " + url)
+            continue
         
     
     return links
 
 
 def tokenize(resp): 
+    # 1. NLTK word split
+    raw_tokens = nltk.word_tokenize(resp)
+    
+    valid_tokens = []
+    # Convert list to set for O(1) lookup speed (much faster than list)
+    stop_words = set(stopwords.words('english'))
 
+    for token in raw_tokens:
+        # 2. Convert to lowercase
+        token = token.lower()
+
+        if token in stop_words:
+            continue
+
+        if token in english_vocab or (len(token) > 2 and token.isalpha()):
+        # 3. Filter: Keep only alphanumeric words (no punctuation) & remove stopwords
+        # .isalnum() removes things like "," "." "!" but keeps "hello" "123"
+            if token.isalnum():
+                valid_tokens.append(token)
+
+    return valid_tokens
+    '''
     tokens = [] 
     current = []
 
@@ -138,12 +183,13 @@ def tokenize(resp):
             tokens.append(word)
 
     return tokens
+    '''
 
 def top50(word_freuqncies): 
     sorted_words = sorted(word_frequencies.items(), key=lambda x: x[1])
     return sorted_words[:50]
 
-def subdomains(visted_urls):
+def count_subdomains(visted_urls):
     subdomains = {}
     for url in visted_urls:
         parsed = urlparse(url)
@@ -169,17 +215,21 @@ def is_valid(url):
         if not any(parsed.netloc.endswith(domain) for domain in allowed_domains):
             return False
 
-        path_check = ["/pix/", "events", "event", ".php"]
+        path_check = ["/pix/", "events", ".php"]
 
         if any(word in parsed.path.lower() for word in path_check):
             return False
 
-        calendar_words = ["calendar", "ical", "=date", "share="]
+        query_check = ["calendar", "ical", "=date", "share=", "version=", "action=history", "format=txt", "precision=second"]
 
-        if re.match(r"^.*?(/.+?/).*?\1.*?\1.*?$", parsed.path.lower()):
+        #if re.match(r"^.*?(/.+?/).*?\1.*?\1.*?$", parsed.path.lower()):
+            #return False
+
+        if any(word in parsed.query.lower() for word in query_check):
             return False
 
-        if any(word in parsed.query.lower() for word in calendar_words):
+        # Block Apache Directory Sorting parameters
+        if re.search(r"c=[a-z];o=[a-z]", parsed.query.lower()):
             return False
 
         # if ".php" in parsed.path.lower():
@@ -190,12 +240,12 @@ def is_valid(url):
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4|mpg"
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
-            + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
+            + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names|ppsx|mol|bib"
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
 
     except (TypeError, ValueError):
-        print("Skipping malformed URL: " + url)
+        print("Malformed URL: " + url)
         raise
