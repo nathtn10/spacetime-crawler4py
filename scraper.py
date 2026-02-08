@@ -7,20 +7,29 @@ nltk.download('stopwords')
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.tokenize import RegexpTokenizer
+import atexit
 
-#A set to store unique visited urls
+# A set to store unique visited urls
 visited_urls = set()
-#Dictionary to store the longest page and its word count
+# Dictionary to store the longest page and its word count
 longest_page= {"url": "", "words_count" : 0}
-#Dictionary to store words and its counts
+# Dictionary to store words and its counts
 word_frequencies = {}
-#Dictionary to store subdomains and number of pages in that subdomain {subdomain: unique pages count}
+# Dictionary to store subdomains and number of pages in that subdomain {subdomain: unique pages count}
 subdomains = {} 
+# Set of words to exclude from counting as word frequency
+exclusionWords = {'january','jan','feb','february','march','mar','april','apr','may','june','jun','jul','july'\
+                      ,'aug','august','september','sept','aug','august','october','oct','november','nov','dec','december','monday',\
+                      'mon','tues','tuesday','wednesday','wed','thursday','thurs','friday','fri','sat','saturday','sun','sunday'}
 
 low_quality_pages = set()
 visited_exact_hashes = set()
 visited_simhashes = {}
 duplicate_count = 0
+# Tokenizer rule
+TOKENIZER = RegexpTokenizer(r"[a-zA-Z0-9]{2,}")
+# Stopwords we use
+stop_words = stopwords.words('english')
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
@@ -31,7 +40,6 @@ def scraper(url, resp):
         with open("crawler_report.txt", "w") as f:
             f.write(f"Unique Pages: {len(visited_urls)}\n")
             f.write(f"Longest Page: {longest_page['url']} ({longest_page['words_count']})\n")
-
     return [link for link in links if is_valid(link)]
 
 
@@ -67,6 +75,14 @@ def print_final_report():
     print("=" * 40)
     print(f"Get rid of near dup page, {duplicate_count}")
 
+@atexit.register
+def final_report_on_exit():
+    print_final_report()
+    with open("crawler_report.txt", "w") as f:
+        f.write(f"Unique Pages: {len(visited_urls)}\n")
+        f.write(f"Longest Page: {longest_page['url']} ({longest_page['words_count']})\n")
+        f.write(f"Near-dup skipped: {duplicate_count}\n")
+
 
 def extract_next_links(url, resp):
     # Implementation required.
@@ -81,7 +97,7 @@ def extract_next_links(url, resp):
     global duplicate_count
     links = [] 
 
-    #change
+    # Skip if there is response error or empty content
     if resp is None or resp.status != 200 : 
         print(resp.error)
         return links
@@ -89,13 +105,13 @@ def extract_next_links(url, resp):
         print(resp.error)
         return links 
 
+    #Add to visited url
+    visited_urls.add(url)
+
     #Check if its text
     content_type = resp.raw_response.headers.get('Content-Type', '').lower()
     if "text" not in content_type and "html" not in content_type:
         return links
-
-    #Add to visited url
-    visited_urls.add(url)
 
     #Filtering out pages that are possibly not html or is word dump
     if not re.search(rb'<[a-z][^>]*>', resp.raw_response.content, re.IGNORECASE):
@@ -140,18 +156,20 @@ def extract_next_links(url, resp):
             is_near_duplicate = True
             break
     
-    #Skip the page if it is near duplicate
+    # Skip the page if it is near duplicate
     if is_near_duplicate:
         return []
 
     # Add the fingerprint to the SimHash set
     visited_simhashes[fingerprint] = url
 
-    #Loop through the tokens to count the word frequencies
+    # Loop through the tokens to count the word frequencies
     for word in tokens:
-        word_frequencies[word] = word_frequencies.get(word, 0) + 1
+        # Exclude numbers from counting frequencies
+        if not word.isdigit():
+            word_frequencies[word] = word_frequencies.get(word, 0) + 1
 
-    #Check if the word count of the current page is longer than the one stored
+    # Check if the word count of the current page is longer than the one stored
     if len(tokens) > longest_page["words_count"] :
         longest_page["url"] = url 
         longest_page["words_count"] = len(tokens)
@@ -210,8 +228,7 @@ def extract_main_text_targeted(soup):
     body = soup.body or soup
     return body.get_text(" ", strip=True)
 
-TOKENIZER = RegexpTokenizer(r"[a-zA-Z0-9]{2,}")
-stop_words = stopwords.words('english')
+
 
 # Tokenizer
 def tokenize(resp): 
@@ -236,12 +253,12 @@ def is_low_quality(soup):
     if soup.find('pre') and len(soup.find_all('p')) < 1:
         return True
 
-#
+# 
 def top50(word_freuqncies): 
     sorted_words = sorted(word_frequencies.items(), key=lambda x: x[1])
     return sorted_words[:50]
 
-#
+# 
 def count_subdomains(visted_urls):
     subdomains = {}
     for url in visted_urls:
@@ -253,6 +270,7 @@ def count_subdomains(visted_urls):
     
     return sorted(subdomains.items())
 
+# 
 def simhash(tokens):
     # Initialize 64-bit vector with zeros
     v = [0] * 64
@@ -323,7 +341,7 @@ def is_valid(url):
         # .php to filter out low information site
         # zip-attachment to filter out non-html
         # dataset to prevent machine learning dataset
-        path_check = ["/pix/", "events", ".php", "zip-attachment", "dataset"]
+        path_check = ["/pix/", "events", ".php", "zip-attachment", "dataset", "grape"]
 
         if any(word in parsed.path.lower() for word in path_check):
             return False
