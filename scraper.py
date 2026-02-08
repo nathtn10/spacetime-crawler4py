@@ -16,7 +16,7 @@ longest_page= {"url": "", "words_count" : 0}
 word_frequencies = {}
 #Dictionary to store subdomains and number of pages in that subdomain {subdomain: unique pages count}
 subdomains = {} 
-#Load the english words in nltk
+
 low_quality_pages = set()
 visited_exact_hashes = set()
 visited_simhashes = {}
@@ -100,24 +100,23 @@ def extract_next_links(url, resp):
     #Filtering out pages that are possibly not html or is word dump
     if not re.search(rb'<[a-z][^>]*>', resp.raw_response.content, re.IGNORECASE):
         print(f"Skipping non-HTML (No tags found): {url}")
-        with open("filtered_pages.log", "a") as log_file:
+        with open("filtered_pages2-7-1.log", "a") as log_file:
             log_file.write(f"Filtered (Low Quality): {url}\n")
-        return links  # (which is empty [])
-    '''
-    if(is_low_quality(soup)):
-        print(f"low quality data dump page {url}")
-        low_quality_pages.add(url)
-        with open("filtered_pages.log", "a") as log_file:
-            log_file.write(f"Filtered (Low Quality): {url}\n")
-        return []
+        return links
+    
+    soup = BeautifulSoup(resp.raw_response.content, "lxml")
+    all_text = extract_main_text_targeted(soup)
     '''
     soup = BeautifulSoup(resp.raw_response.content, 'lxml')
 
-    for script in soup(["script", "style"]):
-        script.extract()
+    for script in soup(["script", "style", "noscript"]):
+        script.decompose()
 
     # 1. Get the text
-    all_text = soup.get_text()
+    #all_text = soup.get_text()
+    body = soup.body or soup
+    all_text = body.get_text(" ", strip=True)
+    '''
     
     # 2. CHECK EXACT DUPLICATES (Fastest check first)
     # We use the standard python hash for this
@@ -145,7 +144,7 @@ def extract_next_links(url, resp):
         if dist <= 1:
             print(f"Skipping near-duplicate: {url}")
             print(f"   -> Similar to: {origin_url}")        
-            with open("filtered_pages.log", "a") as log_file:
+            with open("filtered_pages2-7-1.log", "a") as log_file:
                 log_file.write(f"Skipping near-duplicate: {url}    -> Similar to: {origin_url}\n")
             duplicate_count += 1
             is_near_duplicate = True
@@ -156,39 +155,6 @@ def extract_next_links(url, resp):
 
     # If it's unique, add the fingerprint to the SimHash set
     visited_simhashes[fingerprint] = url
-    '''
-    #This gets all the text
-    all_text = soup.get_text()
-    content_hash = hash(all_text)
-
-    if content_hash in visited_content_hashes:
-        return [] # Skip duplicate
-
-    visited_content_hashes.add(content_hash)
-
-
-    tokens = tokenize(all_text)
-    # If page has almost no or low content, skip SimHash
-    if len(tokens) < 5:
-        return []
-
-    fingerprint = simhash(tokens)
-    is_near_duplicate = False
-    for seen_fp in visited_content_hashes:
-        # If pages differ by 1 bit or less (very similar)
-        if get_hamming_distance(fingerprint, seen_fp) <= 1:
-            print(f"Skipping near-duplicate: {url}")
-            duplicate_count += 1
-            is_near_duplicate = True
-            break
-            
-    if is_near_duplicate:
-        return [] # Skip this page
-
-    # If unique, add to our list and proceed
-    visited_content_hashes.add(fingerprint)
-    '''
-
 
     for word in tokens:
         word_frequencies[word] = word_frequencies.get(word, 0) + 1
@@ -211,19 +177,47 @@ def extract_next_links(url, resp):
                 continue
 
             #Defrag
-            #clean_url = parsed_href.scheme + "://" + parsed_href.netloc + parsed_href.path
-            #if parsed_href.query:
-                #clean_url += "?" + parsed_href.query
             clean_url = parsed_href._replace(fragment="").geturl()
-
-            #print("appending " + clean_url)
             links.append(clean_url)
+
         except ValueError:
             print("Skipping parsed error URL: " + url)
             continue
         
     
     return links
+
+def extract_main_text_targeted(soup):
+    # Remove junk first
+    for tag in soup(["script", "style", "noscript"]):
+        tag.decompose()
+
+    # 1) If there is an <article>, use it
+    article = soup.find("article")
+    if article:
+        for t in article.find_all(["nav", "footer", "header", "aside"]):
+            t.decompose()
+        return article.get_text(" ", strip=True)
+
+    # 2) Otherwise try common “main content” selectors
+    candidates = [
+        soup.select_one("main"),
+        soup.select_one("#main"),
+        soup.select_one("#primary"),
+        soup.select_one(".site-main"),
+        soup.select_one(".entry-content"),
+        soup.select_one(".content-area"),
+        soup.select_one("#content"),
+    ]
+    for c in candidates:
+        if c:
+            for t in c.find_all(["nav", "footer", "header", "aside"]):
+                t.decompose()
+            return c.get_text(" ", strip=True)
+
+    # 3) Fallback: whole body text
+    body = soup.body or soup
+    return body.get_text(" ", strip=True)
 
 TOKENIZER = RegexpTokenizer(r"[a-zA-Z0-9]{2,}")
 stop_words = stopwords.words('english')
