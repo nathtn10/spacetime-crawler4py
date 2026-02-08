@@ -105,42 +105,32 @@ def extract_next_links(url, resp):
         return links
     
     soup = BeautifulSoup(resp.raw_response.content, "lxml")
+    #Get the main text from the page
     all_text = extract_main_text_targeted(soup)
-    '''
-    soup = BeautifulSoup(resp.raw_response.content, 'lxml')
-
-    for script in soup(["script", "style", "noscript"]):
-        script.decompose()
-
-    # 1. Get the text
-    #all_text = soup.get_text()
-    body = soup.body or soup
-    all_text = body.get_text(" ", strip=True)
-    '''
     
-    # 2. CHECK EXACT DUPLICATES (Fastest check first)
-    # We use the standard python hash for this
+    # Check for exact duplicate with python hash
     exact_hash = hash(all_text)
     if exact_hash in visited_exact_hashes:
-        return []  # Skip exact duplicate
+        return []
+
     visited_exact_hashes.add(exact_hash)
 
-    # 3. CHECK NEAR DUPLICATES (Slower, requires SimHash)
+    # Tokenize the text
     tokens = tokenize(all_text)
-    
     # Check if page has enough content to be worth checking
     if len(tokens) < 5:
         return []
 
+    # Check for near duplicate with SimHash
     fingerprint = simhash(tokens)
     
-    # Compare this fingerprint against all PREVIOUS SimHash fingerprints
+    # Compare this fingerprint against all previous fingerprints
     is_near_duplicate = False
     for seen_fp, origin_url in visited_simhashes.items():
         # Calculate distance between two SimHash fingerprints
         dist = get_hamming_distance(fingerprint, seen_fp)
         
-        # Threshold: 0 means identical, 1 means very close
+        # Threshold of 1 to detect close page
         if dist <= 1:
             print(f"Skipping near-duplicate: {url}")
             print(f"   -> Similar to: {origin_url}")        
@@ -149,46 +139,47 @@ def extract_next_links(url, resp):
             duplicate_count += 1
             is_near_duplicate = True
             break
-            
+    
+    #Skip the page if it is near duplicate
     if is_near_duplicate:
-        return [] # Skip this page
+        return []
 
-    # If it's unique, add the fingerprint to the SimHash set
+    # Add the fingerprint to the SimHash set
     visited_simhashes[fingerprint] = url
 
+    #Loop through the tokens to count the word frequencies
     for word in tokens:
         word_frequencies[word] = word_frequencies.get(word, 0) + 1
 
-
+    #Check if the word count of the current page is longer than the one stored
     if len(tokens) > longest_page["words_count"] :
         longest_page["url"] = url 
         longest_page["words_count"] = len(tokens)
         
 
-    #This gets the url from the href tags
+    # Gets the url from the href tags of the page
     for link in soup.find_all('a', href=True):
         href = link['href']
         try:
             abs_url = urljoin(url, href)
             parsed_href = urlparse(abs_url)
 
-            #Skip non http schemes like mailto: or javascript:
+            # Skip non http schemes like mailto: or javascript:
             if parsed_href.scheme not in ["http", "https"]:
                 continue
 
-            #Defrag
+            # Defrag
             clean_url = parsed_href._replace(fragment="").geturl()
             links.append(clean_url)
 
         except ValueError:
             print("Skipping parsed error URL: " + url)
             continue
-        
-    
     return links
 
+# Get the main content of the page, prevent getting things like nav bar or top bar...
 def extract_main_text_targeted(soup):
-    # Remove junk first
+    # Remove non text first
     for tag in soup(["script", "style", "noscript"]):
         tag.decompose()
 
@@ -199,7 +190,7 @@ def extract_main_text_targeted(soup):
             t.decompose()
         return article.get_text(" ", strip=True)
 
-    # 2) Otherwise try common “main content” selectors
+    # 2) Otherwise try common content containers
     candidates = [
         soup.select_one("main"),
         soup.select_one("#main"),
@@ -221,10 +212,10 @@ def extract_main_text_targeted(soup):
 
 TOKENIZER = RegexpTokenizer(r"[a-zA-Z0-9]{2,}")
 stop_words = stopwords.words('english')
+
+# Tokenizer
 def tokenize(resp): 
     tokens = [] 
-
-
     for tok in TOKENIZER.tokenize(resp):
         tok = tok.lower()
 
@@ -240,15 +231,17 @@ def tokenize(resp):
 
     return tokens
 
-#Detect if the web page is data dump
+# Detect if the web page is data dump
 def is_low_quality(soup):
     if soup.find('pre') and len(soup.find_all('p')) < 1:
         return True
 
+#
 def top50(word_freuqncies): 
     sorted_words = sorted(word_frequencies.items(), key=lambda x: x[1])
     return sorted_words[:50]
 
+#
 def count_subdomains(visted_urls):
     subdomains = {}
     for url in visted_urls:
@@ -263,7 +256,7 @@ def count_subdomains(visted_urls):
 def simhash(tokens):
     # Initialize 64-bit vector with zeros
     v = [0] * 64
-    
+
     for token in tokens:
         # 1. Hash the token 
         # We use Python's built-in hash(). 
@@ -288,13 +281,12 @@ def simhash(tokens):
         if v[i] > 0:
             # Set the i-th bit to 1
             fingerprint |= (1 << i)
-            
     return fingerprint
 
 def get_hamming_distance(f1, f2):
     # XOR compares the bits (1 means they are different)
     x = (f1 ^ f2) & ((1 << 64) - 1)
-    
+
     # Count the number of 1s (differences)
     distance = 0
     while x:
@@ -315,9 +307,8 @@ def is_valid(url):
         #Check if domain ends with the allowed domains
         allowed_domains = ["ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
         
-        # Check 1: Is it an exact match? (e.g., "cs.uci.edu")
-        # Check 2: Is it a subdomain? (e.g., "vision.cs.uci.edu")
-        # We add a "." before the domain to ensure we don't match "physics.uci.edu"
+        # Check if in allowed domains
+        # Add a "." before the domain to ensure we don't match "physics.uci.edu"
         is_allowed = False
         for domain in allowed_domains:
             if parsed.netloc == domain or parsed.netloc.endswith("." + domain):
@@ -327,13 +318,23 @@ def is_valid(url):
         if not is_allowed:
             return False
 
+        # /pix/ to filter out the picture sites
+        # events to filter out events calendar trap
+        # .php to filter out low information site
+        # zip-attachment to filter out non-html
+        # dataset to prevent machine learning dataset
         path_check = ["/pix/", "events", ".php", "zip-attachment", "dataset"]
 
         if any(word in parsed.path.lower() for word in path_check):
             return False
 
+        # calendar, ical, =date to filter calendar trap
+        # version= and action=history to filter out those just with different version=
+        # 
+        #
         query_check = ["calendar", "ical", "=date", "share=", "version=", "action=history", "format=txt", "precision=second"]
 
+        # Block repeating path
         if re.match(r"^.*?(/.+?/).*?\1.*?\1.*?$", parsed.path.lower()):
             return False
 
@@ -343,10 +344,6 @@ def is_valid(url):
         # Block Apache Directory Sorting parameters
         if re.search(r"c=[a-z];o=[a-z]", parsed.query.lower()):
             return False
-
-        # if ".php" in parsed.path.lower():
-        #     return False
-
 
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
